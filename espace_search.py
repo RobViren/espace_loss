@@ -86,7 +86,7 @@ def run(q_path, t_path, q_idx):
     print(f"Using Device: {device}")
     
     # Use the loss components to generate embeddings
-    loss_module = ESpaceLoss(device=device, sr=SAMPLE_RATE).to(device)
+    loss_module = ESpaceLoss(device=device, sr=SAMPLE_RATE,r_min=0.9).to(device)
     
     print("Processing E-Space...")
     with torch.no_grad():

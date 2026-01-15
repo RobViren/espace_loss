@@ -43,12 +43,12 @@ class Tank(nn.Module):
         return torch.tanh(z).transpose(1, 2)
 
 class ESpaceLoss(nn.Module):
-    def __init__(self, device='cpu', sr=24000, res_size=64, align_weight=10.0, raw_weight=0.1):
+    def __init__(self, device='cpu', sr=24000, res_size=64, align_weight=10.0, raw_weight=0.1,r_min=0.9999,r_max=0.99999):
         super().__init__()
         self.align_weight = align_weight 
         self.raw_weight = raw_weight
         
-        self.probe = BidirectionalCursedIIR(sr, n_channels=res_size).to(device)
+        self.probe = BidirectionalCursedIIR(sr, n_channels=res_size,r_min=r_min,r_max=r_max).to(device)
         self.tank = Tank(in_dim=res_size*2, out_dim=res_size).to(device)
         
         # Freeze
