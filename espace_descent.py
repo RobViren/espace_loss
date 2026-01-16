@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from espace_loss import ESpaceLoss
+from espace import ESpaceLoss
 from pathlib import Path
 
 # -------------------------
@@ -74,8 +74,7 @@ def main():
     audio_tensor = torch.tensor(data, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
     # 1. Setup Loss (Align only)
-    # Replaced HolographicLoss with ESpaceLoss
-    criterion = ESpaceLoss(sr=SR, align_weight=10.0, raw_weight=0.0)
+    criterion = ESpaceLoss(sr=SR).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     
     # 2. Pre-compute Smooth Embeddings
     print("Pre-computing smooth embeddings...")

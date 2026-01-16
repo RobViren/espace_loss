@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import librosa
 import matplotlib.pyplot as plt
-from espace_loss import ESpaceLoss
+from espace import ESpaceLoss
 
 from pathlib import Path
 

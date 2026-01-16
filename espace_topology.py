@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 
-from espace_loss import ESpaceLoss
+from loss import MSSLoss
+from espace import ESpaceLoss
 
 # -------------------------
 # CONFIG
@@ -39,8 +40,8 @@ def main():
     full_audio = torch.tensor(data, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(DEVICE) # [1, 1, T]
 
     # 2. Setup Loss
-    # We use ESpaceLoss to access the pre-configured Probe and Tank
     criterion = ESpaceLoss(device=DEVICE, sr=SR).to(DEVICE)
+    loss_mss = MSSLoss().to(DEVICE)
     
     # 3. Pre-compute TARGET Embedding (Anchor)
     print("Computing Target Embedding...")
@@ -113,7 +114,7 @@ def main():
             l1_val = F.l1_loss(raw_curr, raw_targ).item()
             l1_hist.append(l1_val)
             
-            mss_val = criterion.mss_loss(raw_curr, raw_targ).item()
+            mss_val = loss_mss(raw_curr, raw_targ).item()
             l_mss_hist.append(mss_val)
 
     # 6. Plotting
@@ -124,9 +125,9 @@ def main():
     plt.figure(figsize=(12, 8))
     plt.plot(offsets, norm(l1_hist), label="L1 (Raw)", color="red", alpha=0.3, linestyle="--")
     plt.plot(offsets, norm(l_mss_hist), label="MSS", color="green", alpha=0.4, linestyle="--")
-    plt.plot(offsets, norm(l_align_hist), label="E-Space Alignment", color="blue", linewidth=3)
+    plt.plot(offsets, norm(l_align_hist), label="ESpace Alignment", color="blue", linewidth=3)
     
-    plt.title(f"Fast E-Space Topology (GPU)\nCenter: {center_idx}")
+    plt.title(f"Fast ESpace Topology (GPU)\nCenter: {center_idx}")
     plt.legend()
     plt.grid(True, alpha=0.3)
     

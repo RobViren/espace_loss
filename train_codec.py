@@ -7,7 +7,8 @@ import torchaudio
 from torch.utils.data import DataLoader, IterableDataset
 from datasets import load_dataset
 import numpy as np
-from espace_loss import ESpaceLoss
+from espace import ESpaceLoss
+from loss import MSSLoss, MSELoss
 
 from pathlib import Path
 
@@ -17,11 +18,13 @@ from pathlib import Path
 SR = 24000
 BATCH_SIZE = 8
 LR = 8e-4
-MAX_STEPS = 50000
+MAX_STEPS = 8000
 CHECKPOINT_INTERVAL = 250
 LOG_INTERVAL = 20
 SEGMENT_SIZE = 72000
 ALIGN_WEIGHT = 10.0
+MSS_WEIGHT = 1.0
+RAW_WEIGHT = 1.0
 RES_SIZE = 64
 
 # ==========================================
@@ -108,7 +111,7 @@ def si_snr(estimate, reference):
 
 class LibriStream(IterableDataset):
     def __init__(self, split="train.clean.100", segment_size=SEGMENT_SIZE):
-        self.ds = load_dataset("mythicinfinity/libritts", "clean", split=split, streaming=True)
+        self.ds = load_dataset("mythicinfinity/libritts", "clean", split=split)
         self.segment_size = segment_size
         self.sr = SR
     def __iter__(self):
@@ -144,7 +147,9 @@ def train(validation_path):
     model = SimpleCodec().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
     
-    criterion = ESpaceLoss(device=device, sr=SR, align_weight=ALIGN_WEIGHT).to(device)
+    # Instantiate Losses Explicitly
+    criterion_espace = ESpaceLoss(device=device, sr=SR).to(device)
+    criterion_mss = MSSLoss().to(device)
     
     val_audio = load_validation_sample(validation_path, device)
     os.makedirs("results/training", exist_ok=True)
@@ -152,7 +157,7 @@ def train(validation_path):
     step = 0
     iterator = iter(loader)
     
-    print("Starting Training (L1 Holographic Mode)...")
+    print("Starting Training...")
     
     while step < MAX_STEPS:
         try:
@@ -162,7 +167,17 @@ def train(validation_path):
             x = next(iterator).to(device)
             
         x_recon = model(x)
-        loss, l_mss, l_align = criterion(x_recon, x)
+        
+        # Calculate Losses Explicitly
+        l_align = criterion_espace(x_recon, x)
+        l_mss = criterion_mss(x_recon, x)
+        
+        # Raw L1 Hole-puncher (Manual L1)
+        T = x.shape[-1]
+        margin = T // 3
+        l_raw = F.l1_loss(x_recon[..., margin:-margin], x[..., margin:-margin])
+        
+        loss = (l_mss * MSS_WEIGHT) + (l_align * ALIGN_WEIGHT) + (l_raw * RAW_WEIGHT)
         
         optimizer.zero_grad()
         loss.backward()
@@ -170,7 +185,7 @@ def train(validation_path):
         optimizer.step()
         
         if step % LOG_INTERVAL == 0:
-            print(f"Step {step:05d} | Total: {loss.item():.3f} | Spec: {l_mss:.3f} | Align: {l_align:.3f}")
+            print(f"Step {step:05d} | Total: {loss.item():.3f} | Spec: {l_mss.item():.3f} | Align: {l_align.item():.4f} | Raw: {l_raw.item():.3f}")
             
         if step % CHECKPOINT_INTERVAL == 0:
             model.eval()
